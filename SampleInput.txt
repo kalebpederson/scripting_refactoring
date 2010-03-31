@@ -1,0 +1,167 @@
+// comments can be single line or multi-line
+
+/* perform a single rename refactoring using standard parameters
+ * specifying the parameters in absolute terms
+ */
+rename { "OldName", "NewName" };
+
+// use named parameters to specify a refactoring.  When all
+// parameters are specified, the order of the named parameters
+// does not need to match the order that the parameters are
+// "declared" in.
+rename { oldName = "OldName2", newName = "NewName2" };
+
+
+// a refactoring may be applied several times using different
+// parameter sequences passed in the refactoring block.  These
+// sequences can mix and match parameter styles.
+rename {
+	"OldName3", "NewName3";
+	oldName = "OldName4", newName = "NewName4";
+};
+
+/* 
+ * the following refactorings match the order of those in the
+ * Parameters to Refactorings section of the thesis
+ */
+
+// support type restrictions.  The following type restrictions
+// should be supported: namespaces (including the global
+// namespace), classes, structs, methods (i.e. functions), type
+// restrictions, and typedefs.  Aliases to restrictions could
+// also be beneficial.  One alias used within my thesis is
+// container which in this case refers to any of namespaces,
+// classes, structs, and blocks.
+rename {
+	// type restriction after name specifier
+	oldName = SomeNamespace{namespace}::/(.*)ElementName/,
+	newName = SomeNamespace::\1Node;
+
+	// type restriction within regular expression
+	/SomeClass{class}::get(.*)Node/,
+	SomeClass::\1Node;
+
+	::memset, ::customMemSet;
+}
+
+// Support alternatives or further restrictions.
+rename {
+	// rename MyContainer if it's a class or a namespace.
+	MyContainer{class || namespace}, NewContainer;
+
+	// assuming container is an alias for "namespaces, classes,
+	// structs, and blocks," then I could write the following to
+	// have namespaces, classes and structs named AnObject
+	// renamed to NewObject as long as they were not blocks:
+	AnObject{container && !blocks}, NewObject;
+};
+
+
+// Note that the following shows a deficiency in the grammar when
+// one assumes that the programmer follows the standard camelCase
+// conventions:
+rename {
+	/SomeClass{class}::get(.*)Node/,
+	// consider for a method named SomeClass::getAstNode().  By
+	// default, one would expect to then have the name
+	// transformed to SomeClass::AstNode() with the get removed.
+	// However, this violates the standard camelcase conventions
+	// used by many programmers.
+	SomeClass::\1Node;
+}
+
+
+extractMethod {
+	// extract everything starting at line 40 up to and including
+	// line 60 and create a new method called newMethodName.  By
+	// default, the new method should exist within the same
+	// container that lines 40-60 exist in.
+	40, 60, newMethodName;
+
+	// use both line and column number as starting and endpoints,
+	// or you can mix and match.
+	40:4, 60:8, newMethodName;
+
+	// rather than using line numbers and columns, we can also
+	// make position references by providing an offset from some
+	// absolute position.  in this case we reference the
+	// beginning of the someMethod definition and then, for this
+	// exmaple, add four or eight lines to that position.
+	// Whether it acts as a reference to an object or a position
+	// marker is based on the parameter types to the refactoring. 
+	@(SomeClass{class}::someMethod{method && definition} + 4),
+	@(SomeClass{class}::someMethod{method && definition} + 8),
+	newMethodName;
+}
+
+extractInterface {
+	// extract interface requires that a list of methods
+	// composing the interface that is to be created be passed as
+	// a parameter in addition to the new interface name.  We
+	// support this list of methods using brackets as is common
+	// to many programming languages:
+	[AClass::firstMethod, AClass::secondMethod], newInterfaceName;
+
+	ANamespace{namespace}::AClass::[firstMethod, secondMethod],
+	newInterfaceName;
+
+	// alternatively, we could provide an additional parameter
+	// that indicated the container to which the members belong.
+	// The parameters would then be: container, methodList,
+	// newInterfaceName.
+	ANamespace{namespace}::AClass,
+	[firstMethod, secondMethod],
+	newInterfaceName;
+
+}
+
+// What special circumstances may exist that I need to consider
+// when working with templates and the preprocessor?
+
+/* 
+   Consider for a moment the following:
+   
+class Test {
+	// ...	
+	void doIt() {
+		int first = 1;
+		{
+			int second = 2;
+			first *= second;
+		}
+		first += first;
+		{
+			int second = 9;
+			first -= second;
+		}
+	} // end doit
+}; // end class Test
+
+*/
+
+// Let us apply the "Convert Local to Field" refactoring to
+// "second" above.  In this case two anonymous blocks are
+// present, each declaring a variable named second.  Thus, the
+// refactoring must specify not only the variable name and the
+// method in which it exists but the specific block which
+// contains the variable.  This is supported using the following
+// syntax:
+
+convertLocalToField {
+	Test{class}::doIt{method}::{anonymous}[2]::second,
+	"constructor",
+	"protected",
+	"static const";
+}
+
+
+extractConstant {
+	// replace the string "SomeConstant" with a "MAGIC_STRING"
+	// constant by creating a new class that is global and
+	// public.
+	"SomeConstant", "MAGIC_STRING", "PlaceInConstantClass";
+
+	// replace the magic number 42 with a constant called
+	// THE_ANSWER and do so by using a file-level global
+	42, "THE_ANSWER", "AnonymousNamespacedFile";
+} 
